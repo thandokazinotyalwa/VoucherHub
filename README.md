@@ -57,30 +57,6 @@ Make sure you have:
 * Git installed
 * A code editor such as VS Code
 
-### Clone the Repository
-
-```bash
-git clone https://github.com/YOUR-USERNAME/VoucherHub.git
-```
-
-### Navigate to the Project
-
-```bash
-cd VoucherHub
-```
-
-### Run the Application
-
-```bash
-dotnet run
-```
-
-The API can then be accessed through the URL displayed in the terminal.
-
-## Project Status
-
-VoucherHub is currently under development. The project will continue to evolve as new features and improvements are added.
-
 ## Future Improvements
 
 Planned improvements include:
