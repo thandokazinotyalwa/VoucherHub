@@ -37,8 +37,37 @@ public class InMemoryVoucherRepository : IVoucherRepository
 
     public Task<Voucher?> GetByIdAsync(int id)
     {
-      var voucher = _vouchers.FirstOrDefault(v => v.Id == id);
+        var voucher = _vouchers.FirstOrDefault(v => v.Id == id);
 
-      return Task.FromResult(voucher);
+        return Task.FromResult(voucher);
+    }
+
+    public Task<Voucher?> CancelAsync(int id)
+    {
+        var voucher = _vouchers.FirstOrDefault(v => v.Id == id);
+
+        if (voucher == null)
+        {
+            return Task.FromResult<Voucher?>(null);
+        }
+
+        voucher.Status = VoucherStatus.Cancelled;
+
+        return Task.FromResult<Voucher?>(voucher);
+    }
+
+
+    public Task<Voucher?> RedeemAsync(int id)
+    {
+        var voucher = _vouchers.FirstOrDefault(v => v.Id == id);
+
+        if (voucher is null)
+        {
+            return Task.FromResult<Voucher?>(null);
+        }
+
+        voucher.Status = VoucherStatus.Redeemed;
+
+        return Task.FromResult<Voucher?>(voucher);
     }
 }

@@ -3,6 +3,8 @@ using VoucherHub.Modules.Vouchers.Application.Services;
 using VoucherHub.Modules.Vouchers.Infrastructure.Repositories;
 using VoucherHub.Modules.Vouchers.API;
 using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
+using VoucherHub.Modules.Vouchers.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,13 +13,16 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
-builder.Services.AddSingleton<IVoucherRepository, InMemoryVoucherRepository>();
+builder.Services.AddScoped<IVoucherRepository, PostgresVoucherRepository>();
 builder.Services.AddScoped<VoucherService>();
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddDbContext<VoucherHubDbContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("VoucherHub")));
 
 var app = builder.Build();
 
@@ -52,9 +57,13 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
+
+
 app.Run();
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
 }
+
+public partial class Program { }

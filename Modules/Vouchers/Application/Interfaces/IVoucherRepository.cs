@@ -10,4 +10,8 @@ public interface IVoucherRepository
     Task<List<Voucher>> GetAllAsync();
     Task<Voucher?> GetByIdAsync(int id);
 
+    Task<Voucher?> CancelAsync(int id);
+
+    Task<Voucher?> RedeemAsync(int id);
+
 }

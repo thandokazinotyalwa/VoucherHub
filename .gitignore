@@ -1,5 +1,15 @@
+
 bin/
 obj/
 .vs/
+.vscode/
 *.user
 *.suo
+
+# Local configuration and secrets
+appsettings.Development.json
+.env
+.env.*
+
+# macOS
+.DS_Store
