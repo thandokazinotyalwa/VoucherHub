@@ -18,7 +18,10 @@
   </ItemGroup>
   
   <ItemGroup>
-    <Compile Remove="VoucherHub.Tests/**/*.cs" />
-  </ItemGroup>
+  <Compile Remove="VoucherHub.Tests/**/*.cs" />
+  <Content Remove="VoucherHub.Tests/**" />
+  <None Remove="VoucherHub.Tests/**" />
+  <EmbeddedResource Remove="VoucherHub.Tests/**" />
+</ItemGroup>
 
 </Project>
