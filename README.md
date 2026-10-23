@@ -47,7 +47,6 @@ Modules/
 * Retrieve voucher information
 * In-memory voucher repository
 
-## Getting Started
 
 ### Prerequisites
 
@@ -56,8 +55,6 @@ Make sure you have:
 * .NET SDK installed
 * Git installed
 * A code editor such as VS Code
-
-## Future Improvements
 
 Planned improvements include:
 
