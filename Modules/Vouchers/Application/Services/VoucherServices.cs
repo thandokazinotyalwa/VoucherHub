@@ -122,6 +122,7 @@ public class VoucherService
 
     
 
+
 public async Task<Voucher?> RedeemVoucherAsync(int id)
 {
     var voucher = await _voucherRepository.GetByIdAsync(id);
@@ -131,18 +132,18 @@ public async Task<Voucher?> RedeemVoucherAsync(int id)
         return null;
     }
 
+    if (voucher.Status != VoucherStatus.Active)
+    {
+        throw new InvalidOperationException(
+            "Only active vouchers can be redeemed.");
+    }
+
     if (voucher.ExpiryDate < DateOnly.FromDateTime(DateTime.UtcNow))
     {
         await _voucherRepository.ExpireAsync(id);
 
         throw new InvalidOperationException(
             "Expired vouchers cannot be redeemed.");
-    }
-
-    if (voucher.Status != VoucherStatus.Active)
-    {
-        throw new InvalidOperationException(
-            "Only active vouchers can be redeemed.");
     }
 
     return await _voucherRepository.RedeemAsync(id);

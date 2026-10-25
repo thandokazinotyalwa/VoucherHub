@@ -76,6 +76,40 @@ public class VoucherServiceTests
             () => service.RedeemVoucherAsync(1));
     }
 
+
+[Fact]
+public async Task RedeemVoucherAsync_WhenCancelledVoucherHasExpired_ThrowsInvalidOperationException()
+{
+    var repository = new TestVoucherRepository
+    {
+        StoredVoucher = new Voucher
+        {
+            Id = 1,
+            Code = "VH-TEST123",
+            Amount = 500,
+            Status = VoucherStatus.Cancelled,
+            ExpiryDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1)
+        }
+    };
+
+    var settings = Options.Create(new VoucherSettings
+    {
+        ValidityDays = 30
+    });
+
+    var service = new VoucherService(repository, settings);
+
+    var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+        () => service.RedeemVoucherAsync(1));
+
+    Assert.Equal(
+        "Only active vouchers can be redeemed.",
+        exception.Message);
+
+    Assert.Equal(VoucherStatus.Cancelled, repository.StoredVoucher.Status);
+}
+
+
     [Fact]
     public async Task RedeemVoucherAsync_WhenVoucherExpired_ThrowsInvalidOperationException()
     {
@@ -129,6 +163,9 @@ public class VoucherServiceTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.CancelVoucherAsync(1));
+        
+        Assert.Equal(VoucherStatus.Redeemed, repository.StoredVoucher.Status);
+   
     }
 
     [Fact]
@@ -141,6 +178,36 @@ public class VoucherServiceTests
 
         Assert.Null(voucher);
     }
+
+
+[Fact]
+public async Task GetVoucherByIdAsync_WhenVoucherExpiresToday_RemainsActive()
+{
+    var repository = new TestVoucherRepository
+    {
+        StoredVoucher = new Voucher
+        {
+            Id = 1,
+            Code = "VH-TEST789",
+            Amount = 500,
+            Status = VoucherStatus.Active,
+            ExpiryDate = DateOnly.FromDateTime(DateTime.UtcNow)
+        }
+    };
+
+    var settings = Options.Create(new VoucherSettings
+    {
+        ValidityDays = 30
+    });
+
+    var service = new VoucherService(repository, settings);
+
+    var voucher = await service.GetVoucherByIdAsync(1);
+
+    Assert.NotNull(voucher);
+    Assert.Equal(VoucherStatus.Active, voucher.Status);
+}
+
 
     [Fact]
     public async Task UpdateVoucherAsync_WhenVoucherDoesNotExist_ReturnsNull()
