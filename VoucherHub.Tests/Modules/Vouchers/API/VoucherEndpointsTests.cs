@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Xunit;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using VoucherHub.Modules.Vouchers.Domain;
 using VoucherHub.Modules.Vouchers.Infrastructure.Persistence;
@@ -30,6 +31,56 @@ public class VoucherEndpointsTests
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+
+
+[Fact]
+public async Task GetAllVouchers_ReturnsOkWithVoucherList()
+{
+    // Arrange
+    using var scope = _factory.Services.CreateScope();
+    var dbContext = scope.ServiceProvider
+        .GetRequiredService<VoucherHubDbContext>();
+
+    var voucher = new Voucher
+    {
+        Code = "VH-LIST123",
+        Amount = 500,
+        Status = VoucherStatus.Active,
+        ExpiryDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10)
+    };
+
+    dbContext.Vouchers.Add(voucher);
+    await dbContext.SaveChangesAsync();
+
+    var savedVoucher = await dbContext.Vouchers
+    .FirstAsync(item => item.Code == "VH-LIST123");
+
+Assert.Equal("VH-LIST123", savedVoucher.Code);
+
+    // Act
+    var response = await _client.GetAsync("/api/vouchers");
+
+    // Assert
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+    var options = new System.Text.Json.JsonSerializerOptions(
+    System.Text.Json.JsonSerializerDefaults.Web)
+{
+    Converters =
+    {
+        new System.Text.Json.Serialization.JsonStringEnumConverter()
+    }
+};
+
+    var vouchers = await response.Content
+        .ReadFromJsonAsync<List<Voucher>>(options);
+
+    Assert.NotNull(vouchers);
+    Assert.Contains(vouchers, item => item.Code == "VH-LIST123");
+}
+
+
 
     [Fact]
     public async Task CreateVoucher_WithValidAmount_ReturnsCreatedVoucher()

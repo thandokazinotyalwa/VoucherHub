@@ -168,6 +168,36 @@ public async Task RedeemVoucherAsync_WhenCancelledVoucherHasExpired_ThrowsInvali
    
     }
 
+
+[Fact]
+public async Task CancelVoucherAsync_WhenVoucherAlreadyCancelled_ThrowsInvalidOperationException()
+{
+    var repository = new TestVoucherRepository
+    {
+        StoredVoucher = new Voucher
+        {
+            Id = 1,
+            Code = "VH-TEST123",
+            Amount = 500,
+            Status = VoucherStatus.Cancelled,
+            ExpiryDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10)
+        }
+    };
+
+    var settings = Options.Create(new VoucherSettings
+    {
+        ValidityDays = 30
+    });
+
+    var service = new VoucherService(repository, settings);
+
+    await Assert.ThrowsAsync<InvalidOperationException>(
+        () => service.CancelVoucherAsync(1));
+
+    Assert.Equal(VoucherStatus.Cancelled, repository.StoredVoucher.Status);
+}
+
+
     [Fact]
     public async Task GetVoucherByIdAsync_WhenVoucherDoesNotExist_ReturnsNull()
     {
@@ -220,6 +250,37 @@ public async Task GetVoucherByIdAsync_WhenVoucherExpiresToday_RemainsActive()
 
         Assert.Null(voucher);
     }
+
+
+[Fact]
+public async Task UpdateVoucherAsync_WhenVoucherIsRedeemed_PreservesRedeemedStatus()
+{
+    var repository = new TestVoucherRepository
+    {
+        StoredVoucher = new Voucher
+        {
+            Id = 1,
+            Code = "VH-TEST123",
+            Amount = 500,
+            Status = VoucherStatus.Redeemed,
+            ExpiryDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10)
+        }
+    };
+
+    var service = new VoucherService(
+        repository,
+        Options.Create(new VoucherSettings { ValidityDays = 30 }));
+
+    var request = new UpdateVoucherRequest { Amount = 800 };
+
+    var voucher = await service.UpdateVoucherAsync(1, request);
+
+    Assert.NotNull(voucher);
+    Assert.Equal(800, voucher.Amount);
+    Assert.Equal(VoucherStatus.Redeemed, voucher.Status);
+}
+
+
 
     [Fact]
     public async Task UpdateVoucherAsync_WithZeroAmount_ThrowsArgumentException()
