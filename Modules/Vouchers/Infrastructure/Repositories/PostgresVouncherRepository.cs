@@ -82,4 +82,22 @@ public class PostgresVoucherRepository : IVoucherRepository
 
         return voucher;
     }
+
+
+public async Task<Voucher?> ExpireAsync(int id)
+{
+    var voucher = await _dbContext.Vouchers.FindAsync(id);
+
+    if (voucher is null)
+    {
+        return null;
+    }
+
+    voucher.Status = VoucherStatus.Expired;
+
+    await _dbContext.SaveChangesAsync();
+
+    return voucher;
+}
+
 }

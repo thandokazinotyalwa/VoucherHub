@@ -4,6 +4,8 @@ using VoucherHub.Modules.Vouchers.Application.Interfaces;
 using VoucherHub.Modules.Vouchers.Application.Services;
 using VoucherHub.Modules.Vouchers.Domain;
 using Xunit;
+using Microsoft.Extensions.Options;
+using VoucherHub.Modules.Vouchers.Application.Configuration;
 
 namespace VoucherHub.Tests.Modules.Vouchers.Application;
 
@@ -12,39 +14,45 @@ public class VoucherServiceTests
     [Fact]
     public async Task CreateVoucherAsync_WithZeroAmount_ThrowsArgumentException()
     {
-        // Arrange
-        IVoucherRepository repository = new TestVoucherRepository();
-        var service = new VoucherService(repository);
+        var repository = new TestVoucherRepository();
+        var settings = Options.Create(new VoucherSettings
+        {
+            ValidityDays = 30
+        });
+
+        var service = new VoucherService(repository, settings);
         var request = new CreateVoucherRequest { Amount = 0 };
 
-        // Act and Assert
         await Assert.ThrowsAsync<ArgumentException>(
             () => service.CreateVoucherAsync(request));
     }
 
-
     [Fact]
     public async Task CreateVoucherAsync_WithValidAmount_CreatesActiveVoucher()
     {
-        // Arrange
-        IVoucherRepository repository = new TestVoucherRepository();
-        var service = new VoucherService(repository);
+        var repository = new TestVoucherRepository();
+        var settings = Options.Create(new VoucherSettings
+        {
+            ValidityDays = 30
+        });
+
+        var service = new VoucherService(repository, settings);
         var request = new CreateVoucherRequest { Amount = 500 };
 
-        // Act
         var voucher = await service.CreateVoucherAsync(request);
 
-        // Assert
         Assert.Equal(500, voucher.Amount);
         Assert.Equal(VoucherStatus.Active, voucher.Status);
         Assert.StartsWith("VH-", voucher.Code);
         Assert.NotEmpty(voucher.Code);
+        Assert.Equal(
+            DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30),
+            voucher.ExpiryDate);
     }
 
     [Fact]
     public async Task RedeemVoucherAsync_WhenVoucherAlreadyRedeemed_ThrowsInvalidOperationException()
     {
-        // Arrange
         var repository = new TestVoucherRepository
         {
             StoredVoucher = new Voucher
@@ -52,21 +60,114 @@ public class VoucherServiceTests
                 Id = 1,
                 Code = "VH-TEST123",
                 Amount = 500,
-                Status = VoucherStatus.Redeemed
+                Status = VoucherStatus.Redeemed,
+                ExpiryDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10)
             }
         };
 
-        var service = new VoucherService(repository);
+        var settings = Options.Create(new VoucherSettings
+        {
+            ValidityDays = 30
+        });
 
-        // Act and Assert
+        var service = new VoucherService(repository, settings);
+
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.RedeemVoucherAsync(1));
     }
 
     [Fact]
-public async Task CancelVoucherAsync_WhenVoucherAlreadyRedeemed_ThrowsInvalidOperationException()
+    public async Task RedeemVoucherAsync_WhenVoucherExpired_ThrowsInvalidOperationException()
+    {
+        var repository = new TestVoucherRepository
+        {
+            StoredVoucher = new Voucher
+            {
+                Id = 1,
+                Code = "VH-TEST123",
+                Amount = 500,
+                Status = VoucherStatus.Active,
+                ExpiryDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1)
+            }
+        };
+
+        var settings = Options.Create(new VoucherSettings
+        {
+            ValidityDays = 30
+        });
+
+        var service = new VoucherService(repository, settings);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.RedeemVoucherAsync(1));
+
+        Assert.Equal(VoucherStatus.Expired, repository.StoredVoucher.Status);
+    }
+
+
+    [Fact]
+    public async Task CancelVoucherAsync_WhenVoucherAlreadyRedeemed_ThrowsInvalidOperationException()
+    {
+        var repository = new TestVoucherRepository
+        {
+            StoredVoucher = new Voucher
+            {
+                Id = 1,
+                Code = "VH-TEST123",
+                Amount = 500,
+                Status = VoucherStatus.Redeemed,
+                ExpiryDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10)
+            }
+        };
+
+        var settings = Options.Create(new VoucherSettings
+        {
+            ValidityDays = 30
+        });
+
+        var service = new VoucherService(repository, settings);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.CancelVoucherAsync(1));
+    }
+
+    [Fact]
+    public async Task GetVoucherByIdAsync_WhenVoucherDoesNotExist_ReturnsNull()
+    {
+        var repository = new TestVoucherRepository();
+        var service = new VoucherService(repository, Options.Create(new VoucherSettings { ValidityDays = 30 }));
+
+        var voucher = await service.GetVoucherByIdAsync(999);
+
+        Assert.Null(voucher);
+    }
+
+    [Fact]
+    public async Task UpdateVoucherAsync_WhenVoucherDoesNotExist_ReturnsNull()
+    {
+        var repository = new TestVoucherRepository();
+        var service = new VoucherService(repository, Options.Create(new VoucherSettings { ValidityDays = 30 }));
+        var request = new UpdateVoucherRequest { Amount = 800 };
+
+        var voucher = await service.UpdateVoucherAsync(999, request);
+
+        Assert.Null(voucher);
+    }
+
+    [Fact]
+    public async Task UpdateVoucherAsync_WithZeroAmount_ThrowsArgumentException()
+    {
+        var repository = new TestVoucherRepository();
+        var service = new VoucherService(repository, Options.Create(new VoucherSettings { ValidityDays = 30 }));
+        var request = new UpdateVoucherRequest { Amount = 0 };
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => service.UpdateVoucherAsync(1, request));
+    }
+
+    [Fact]
+public async Task GetAllVouchersAsync_WhenVoucherHasExpired_MarksItAsExpired()
 {
-    // Arrange
     var repository = new TestVoucherRepository
     {
         StoredVoucher = new Voucher
@@ -74,108 +175,93 @@ public async Task CancelVoucherAsync_WhenVoucherAlreadyRedeemed_ThrowsInvalidOpe
             Id = 1,
             Code = "VH-TEST123",
             Amount = 500,
-            Status = VoucherStatus.Redeemed
+            Status = VoucherStatus.Active,
+            ExpiryDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1)
         }
     };
 
-    var service = new VoucherService(repository);
+    var settings = Options.Create(new VoucherSettings
+    {
+        ValidityDays = 30
+    });
 
-    // Act and Assert
-    await Assert.ThrowsAsync<InvalidOperationException>(
-        () => service.CancelVoucherAsync(1));
+    var service = new VoucherService(repository, settings);
+
+    var vouchers = await service.GetAllVouchersAsync();
+
+    Assert.Single(vouchers);
+    Assert.Equal(VoucherStatus.Expired, vouchers[0].Status);
 }
 
 [Fact]
-public async Task GetVoucherByIdAsync_WhenVoucherDoesNotExist_ReturnsNull()
+public async Task GetVoucherByIdAsync_WhenVoucherHasExpired_MarksItAsExpired()
 {
-    // Arrange
-    var repository = new TestVoucherRepository();
-    var service = new VoucherService(repository);
+    var repository = new TestVoucherRepository
+    {
+        StoredVoucher = new Voucher
+        {
+            Id = 1,
+            Code = "VH-TEST456",
+            Amount = 500,
+            Status = VoucherStatus.Active,
+            ExpiryDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1)
+        }
+    };
 
-    // Act
-    var voucher = await service.GetVoucherByIdAsync(999);
+    var settings = Options.Create(new VoucherSettings
+    {
+        ValidityDays = 30
+    });
 
-    // Assert
-    Assert.Null(voucher);
+    var service = new VoucherService(repository, settings);
+
+    var voucher = await service.GetVoucherByIdAsync(1);
+
+    Assert.NotNull(voucher);
+    Assert.Equal(VoucherStatus.Expired, voucher.Status);
 }
-
-
-[Fact]
-public async Task UpdateVoucherAsync_WhenVoucherDoesNotExist_ReturnsNull()
-{
-    // Arrange
-    var repository = new TestVoucherRepository();
-    var service = new VoucherService(repository);
-    var request = new UpdateVoucherRequest { Amount = 800 };
-
-    // Act
-    var voucher = await service.UpdateVoucherAsync(999, request);
-
-    // Assert
-    Assert.Null(voucher);
-}
-
-
-[Fact]
-public async Task UpdateVoucherAsync_WithZeroAmount_ThrowsArgumentException()
-{
-    // Arrange
-    var repository = new TestVoucherRepository();
-    var service = new VoucherService(repository);
-    var request = new UpdateVoucherRequest { Amount = 0 };
-
-    // Act and Assert
-    await Assert.ThrowsAsync<ArgumentException>(
-        () => service.UpdateVoucherAsync(1, request));
-}
-
-
-[Fact]
-public async Task RedeemVoucherAsync_WhenVoucherDoesNotExist_ReturnsNull()
-{
-    // Arrange
-    var repository = new TestVoucherRepository();
-    var service = new VoucherService(repository);
-
-    // Act
-    var voucher = await service.RedeemVoucherAsync(999);
-
-    // Assert
-    Assert.Null(voucher);
-}
-
-
-[Fact]
-public async Task CancelVoucherAsync_WhenVoucherDoesNotExist_ReturnsNull()
-{
-    // Arrange
-    var repository = new TestVoucherRepository();
-    var service = new VoucherService(repository);
-
-    // Act
-    var voucher = await service.CancelVoucherAsync(999);
-
-    // Assert
-    Assert.Null(voucher);
-}
-
     private class TestVoucherRepository : IVoucherRepository
     {
-        public Task<Voucher> AddAsync(Voucher voucher) =>
-            Task.FromResult(voucher);
+        public Voucher? StoredVoucher { get; set; }
+
+        public Task<Voucher> AddAsync(Voucher voucher)
+        {
+            StoredVoucher = voucher;
+            StoredVoucher.Id = 1;
+            return Task.FromResult(StoredVoucher);
+        }
 
         public Task<List<Voucher>> GetAllAsync() =>
-            Task.FromResult(new List<Voucher>());
+            Task.FromResult(
+                StoredVoucher is null
+                    ? new List<Voucher>()
+                    : new List<Voucher> { StoredVoucher });
 
         public Task<Voucher?> GetByIdAsync(int id) =>
-    Task.FromResult(
-        StoredVoucher?.Id == id ? StoredVoucher : null);
+            Task.FromResult(
+                StoredVoucher?.Id == id ? StoredVoucher : null);
 
-        public Task<Voucher?> UpdateAsync(int id, Voucher voucher) =>
-            Task.FromResult<Voucher?>(null);
+        public Task<Voucher?> UpdateAsync(int id, Voucher voucher)
+        {
+            if (StoredVoucher is null || StoredVoucher.Id != id)
+            {
+                return Task.FromResult<Voucher?>(null);
+            }
 
-        public Task<Voucher?> CancelAsync(int id) =>
-            Task.FromResult<Voucher?>(null);
+            StoredVoucher.Amount = voucher.Amount;
+            return Task.FromResult<Voucher?>(StoredVoucher);
+        }
+
+        public Task<Voucher?> CancelAsync(int id)
+        {
+            if (StoredVoucher is null || StoredVoucher.Id != id)
+            {
+                return Task.FromResult<Voucher?>(null);
+            }
+
+            StoredVoucher.Status = VoucherStatus.Cancelled;
+            return Task.FromResult<Voucher?>(StoredVoucher);
+        }
 
         public Task<Voucher?> RedeemAsync(int id)
         {
@@ -185,13 +271,18 @@ public async Task CancelVoucherAsync_WhenVoucherDoesNotExist_ReturnsNull()
             }
 
             StoredVoucher.Status = VoucherStatus.Redeemed;
-
             return Task.FromResult<Voucher?>(StoredVoucher);
         }
 
-        public Voucher? StoredVoucher { get; set; }
+        public Task<Voucher?> ExpireAsync(int id)
+        {
+            if (StoredVoucher is null || StoredVoucher.Id != id)
+            {
+                return Task.FromResult<Voucher?>(null);
+            }
+
+            StoredVoucher.Status = VoucherStatus.Expired;
+            return Task.FromResult<Voucher?>(StoredVoucher);
+        }
     }
-
-
-
 }

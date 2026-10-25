@@ -70,4 +70,18 @@ public class InMemoryVoucherRepository : IVoucherRepository
 
         return Task.FromResult<Voucher?>(voucher);
     }
+
+    public Task<Voucher?> ExpireAsync(int id)
+    {
+        var voucher = _vouchers.FirstOrDefault(v => v.Id == id);
+
+        if (voucher is null)
+        {
+            return Task.FromResult<Voucher?>(null);
+        }
+
+        voucher.Status = VoucherStatus.Expired;
+
+        return Task.FromResult<Voucher?>(voucher);
+    }
 }

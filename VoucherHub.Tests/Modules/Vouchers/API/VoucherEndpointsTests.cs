@@ -51,6 +51,8 @@ public class VoucherEndpointsTests
         Assert.StartsWith("VH-", voucher.Code);
     }
 
+    
+
 
     [Fact]
     public async Task CreateVoucher_WithZeroAmount_ReturnsBadRequest()
@@ -102,80 +104,80 @@ public class VoucherEndpointsTests
     }
 
 
-[Fact]
-public async Task RedeemVoucher_WhenVoucherDoesNotExist_ReturnsNotFound()
-{
-    // Act
-    var response = await _client.PostAsync(
-        "/api/vouchers/999/redeem",
-        content: null);
+    [Fact]
+    public async Task RedeemVoucher_WhenVoucherDoesNotExist_ReturnsNotFound()
+    {
+        // Act
+        var response = await _client.PostAsync(
+            "/api/vouchers/999/redeem",
+            content: null);
 
-    // Assert
-    Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-}
-
-
-[Fact]
-public async Task RedeemVoucher_WhenAlreadyRedeemed_ReturnsConflict()
-{
-    // Arrange: create a voucher
-    var createResponse = await _client.PostAsJsonAsync(
-        "/api/vouchers",
-        new { Amount = 250m });
-
-    Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
-
-    var voucher =
-        await createResponse.Content.ReadFromJsonAsync<VoucherResponse>();
-
-    Assert.NotNull(voucher);
-
-    // Redeem it once
-    var firstResponse = await _client.PostAsync(
-        $"/api/vouchers/{voucher.Id}/redeem",
-        content: null);
-
-    Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
-
-    // Act: attempt to redeem it again
-    var secondResponse = await _client.PostAsync(
-        $"/api/vouchers/{voucher.Id}/redeem",
-        content: null);
-
-    // Assert
-    Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
-}
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
 
 
-[Fact]
-public async Task CancelVoucher_WhenActive_ReturnsCancelledVoucher()
-{
-    // Arrange: create a voucher
-    var createResponse = await _client.PostAsJsonAsync(
-        "/api/vouchers",
-        new { Amount = 250m });
+    [Fact]
+    public async Task RedeemVoucher_WhenAlreadyRedeemed_ReturnsConflict()
+    {
+        // Arrange: create a voucher
+        var createResponse = await _client.PostAsJsonAsync(
+            "/api/vouchers",
+            new { Amount = 250m });
 
-    Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
-    var voucher =
-        await createResponse.Content.ReadFromJsonAsync<VoucherResponse>();
+        var voucher =
+            await createResponse.Content.ReadFromJsonAsync<VoucherResponse>();
 
-    Assert.NotNull(voucher);
+        Assert.NotNull(voucher);
 
-    // Act: cancel the voucher
-    var cancelResponse = await _client.DeleteAsync(
-        $"/api/vouchers/{voucher.Id}");
+        // Redeem it once
+        var firstResponse = await _client.PostAsync(
+            $"/api/vouchers/{voucher.Id}/redeem",
+            content: null);
 
-    // Assert
-    Assert.Equal(HttpStatusCode.OK, cancelResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
 
-    var cancelledVoucher =
-        await cancelResponse.Content.ReadFromJsonAsync<VoucherResponse>();
+        // Act: attempt to redeem it again
+        var secondResponse = await _client.PostAsync(
+            $"/api/vouchers/{voucher.Id}/redeem",
+            content: null);
 
-    Assert.NotNull(cancelledVoucher);
-    Assert.Equal(voucher.Id, cancelledVoucher.Id);
-    Assert.Equal("Cancelled", cancelledVoucher.Status);
-}
+        // Assert
+        Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
+    }
+
+
+    [Fact]
+    public async Task CancelVoucher_WhenActive_ReturnsCancelledVoucher()
+    {
+        // Arrange: create a voucher
+        var createResponse = await _client.PostAsJsonAsync(
+            "/api/vouchers",
+            new { Amount = 250m });
+
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+        var voucher =
+            await createResponse.Content.ReadFromJsonAsync<VoucherResponse>();
+
+        Assert.NotNull(voucher);
+
+        // Act: cancel the voucher
+        var cancelResponse = await _client.DeleteAsync(
+            $"/api/vouchers/{voucher.Id}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, cancelResponse.StatusCode);
+
+        var cancelledVoucher =
+            await cancelResponse.Content.ReadFromJsonAsync<VoucherResponse>();
+
+        Assert.NotNull(cancelledVoucher);
+        Assert.Equal(voucher.Id, cancelledVoucher.Id);
+        Assert.Equal("Cancelled", cancelledVoucher.Status);
+    }
 
 
 

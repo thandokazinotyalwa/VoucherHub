@@ -14,4 +14,5 @@ public interface IVoucherRepository
 
     Task<Voucher?> RedeemAsync(int id);
 
+    Task<Voucher?> ExpireAsync(int id);
 }

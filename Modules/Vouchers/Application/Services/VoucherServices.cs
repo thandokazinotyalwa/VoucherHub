@@ -1,27 +1,61 @@
 using VoucherHub.Modules.Vouchers.Application.Interfaces;
 using VoucherHub.Modules.Vouchers.Domain;
 using VoucherHub.Modules.Vouchers.Application.DTOs;
+using Microsoft.Extensions.Options;
+using VoucherHub.Modules.Vouchers.Application.Configuration;
 
 namespace VoucherHub.Modules.Vouchers.Application.Services;
 
 public class VoucherService
 {
     private readonly IVoucherRepository _voucherRepository;
+    private readonly VoucherSettings _voucherSettings;
 
-    public VoucherService(IVoucherRepository voucherRepository)
+    public VoucherService(
+        IVoucherRepository voucherRepository,
+        IOptions<VoucherSettings> voucherSettings
+        )
     {
         _voucherRepository = voucherRepository;
+        _voucherSettings = voucherSettings.Value;
     }
 
     public async Task<List<Voucher>> GetAllVouchersAsync()
+{
+    var vouchers = await _voucherRepository.GetAllAsync();
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+    foreach (var voucher in vouchers)
     {
-        return await _voucherRepository.GetAllAsync();
+        if (voucher.Status == VoucherStatus.Active &&
+            voucher.ExpiryDate < today)
+        {
+            await _voucherRepository.ExpireAsync(voucher.Id);
+        }
     }
 
+    return await _voucherRepository.GetAllAsync();
+}
+
     public async Task<Voucher?> GetVoucherByIdAsync(int id)
+{
+    var voucher = await _voucherRepository.GetByIdAsync(id);
+
+    if (voucher is null)
     {
-        return await _voucherRepository.GetByIdAsync(id);
+        return null;
     }
+
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+    if (voucher.Status == VoucherStatus.Active &&
+        voucher.ExpiryDate < today)
+    {
+        return await _voucherRepository.ExpireAsync(voucher.Id);
+    }
+
+    return voucher;
+}
 
     public async Task<Voucher> CreateVoucherAsync(CreateVoucherRequest request)
     {
@@ -34,7 +68,9 @@ public class VoucherService
         {
             Code = GenerateCode(),
             Amount = request.Amount,
-            Status = VoucherStatus.Active
+            Status = VoucherStatus.Active,
+            ExpiryDate = DateOnly.FromDateTime(DateTime.UtcNow)
+    .AddDays(_voucherSettings.ValidityDays)
         };
 
         return await _voucherRepository.AddAsync(voucher);
@@ -84,23 +120,35 @@ public class VoucherService
     }
 
 
-    public async Task<Voucher?> RedeemVoucherAsync(int id)
+    
+
+public async Task<Voucher?> RedeemVoucherAsync(int id)
+{
+    var voucher = await _voucherRepository.GetByIdAsync(id);
+
+    if (voucher is null)
     {
-        var voucher = await _voucherRepository.GetByIdAsync(id);
-
-        if (voucher is null)
-        {
-            return null;
-        }
-
-        if (voucher.Status != VoucherStatus.Active)
-        {
-            throw new InvalidOperationException(
-                "Only active vouchers can be redeemed.");
-        }
-
-        return await _voucherRepository.RedeemAsync(id);
+        return null;
     }
+
+    if (voucher.ExpiryDate < DateOnly.FromDateTime(DateTime.UtcNow))
+    {
+        await _voucherRepository.ExpireAsync(id);
+
+        throw new InvalidOperationException(
+            "Expired vouchers cannot be redeemed.");
+    }
+
+    if (voucher.Status != VoucherStatus.Active)
+    {
+        throw new InvalidOperationException(
+            "Only active vouchers can be redeemed.");
+    }
+
+    return await _voucherRepository.RedeemAsync(id);
+}
+
+
 
 
 
