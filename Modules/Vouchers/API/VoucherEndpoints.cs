@@ -27,7 +27,7 @@ public static class VoucherEndpoints
         });
 
 
-        app.MapPut("/api/vouchers/{id}", async (
+        app.MapPut("/api/vouchers/{id:int}", async (
             int id,
             UpdateVoucherRequest request,
             VoucherService voucherService) =>
@@ -68,7 +68,7 @@ public static class VoucherEndpoints
             return Results.Ok(voucher);
         });
 
-        app.MapDelete("/api/vouchers/{id}", async (int id, VoucherService voucherService) =>
+        app.MapDelete("/api/vouchers/{id:int}", async (int id, VoucherService voucherService) =>
         {
             try
             {
