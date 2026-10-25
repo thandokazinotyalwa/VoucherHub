@@ -9,6 +9,16 @@ using Microsoft.Extensions.Validation;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AngularApp", policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 builder.Services.AddValidation();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -28,6 +38,8 @@ builder.Services.AddDbContext<VoucherHubDbContext>(options =>
         builder.Configuration.GetConnectionString("VoucherHub")));
 
 var app = builder.Build();
+
+app.UseCors("AngularApp");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
